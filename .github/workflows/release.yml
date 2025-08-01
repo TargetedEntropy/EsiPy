@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: 'Deploy to Test PyPI instead of PyPI'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Check package
+      run: |
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+  test-build:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.11', '3.12']
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+    - name: Install built package
+      run: |
+        pip install dist/*.whl
+
+    - name: Test installed package
+      run: |
+        python -c "
+        from esipy import EsiApp, EsiClient, EsiSecurity
+        import esipy
+        print(f'✓ EsiPy {esipy.__version__} installed successfully')
+        
+        app = EsiApp()
+        print(f'✓ EsiApp works with {len(app.op.keys())} operations')
+        
+        client = EsiClient(headers={'User-Agent': 'EsiPy-Release-Test'})
+        print('✓ EsiClient works')
+        
+        print('✅ Release build test passed!')
+        "
+
+  deploy:
+    needs: [build, test-build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.test_pypi == 'true'
+    
+    environment:
+      name: ${{ github.event.inputs.test_pypi == 'true' && 'testpypi' || 'pypi' }}
+      url: ${{ github.event.inputs.test_pypi == 'true' && 'https://test.pypi.org/p/esipy' || 'https://pypi.org/p/esipy' }}
+
+    permissions:
+      id-token: write  # For trusted publishing
+
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+    - name: Publish to Test PyPI
+      if: github.event.inputs.test_pypi == 'true'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+
+    - name: Publish to PyPI
+      if: github.event_name == 'release'
+      uses: pypa/gh-action-pypi-publish@release/v1

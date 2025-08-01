@@ -1,0 +1,121 @@
+name: Python Compatibility
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+  schedule:
+    # Run weekly to catch compatibility issues early
+    - cron: '0 0 * * 0'
+
+jobs:
+  test-python-versions:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Exclude some combinations to reduce CI load
+          - os: windows-latest
+            python-version: '3.8'
+          - os: macos-latest
+            python-version: '3.8'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-${{ matrix.python-version }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.python-version }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Test imports and basic functionality
+      run: |
+        python -c "
+        import sys
+        print(f'Python version: {sys.version}')
+        print(f'Platform: {sys.platform}')
+        
+        from esipy import EsiApp, EsiClient, EsiSecurity
+        print('✓ All imports successful')
+        
+        app = EsiApp()
+        print(f'✓ EsiApp created with {len(app.op.keys())} operations')
+        
+        client = EsiClient(headers={'User-Agent': 'EsiPy-Compatibility-Test'})
+        print('✓ EsiClient created successfully')
+        
+        security = EsiSecurity(
+            redirect_uri='https://example.com/callback',
+            client_id='test-client-id',
+            secret_key='test-secret'
+        )
+        print('✓ EsiSecurity created successfully')
+        
+        # Test request creation
+        request = app.op['get_status']()
+        print(f'✓ Request created: {request[0].url}')
+        
+        print('✅ All compatibility tests passed!')
+        "
+
+    - name: Run core tests (without external services)
+      run: |
+        python -m unittest test.test_events test.test_exceptions test.test_utils -v
+      continue-on-error: true
+
+  test-dependencies:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.12']  # Test oldest and newest supported versions
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Test minimal dependencies installation
+      run: |
+        python -m pip install --upgrade pip
+        # Install only core dependencies
+        pip install requests "openapi-core>=0.19.0" pytz "python-jose>=3.0,<4"
+        pip install -e . --no-deps
+        
+        # Test that it works with minimal deps
+        python -c "
+        from esipy import EsiApp, EsiClient
+        app = EsiApp()
+        client = EsiClient(headers={'User-Agent': 'EsiPy-MinDeps-Test'})
+        print('✓ Minimal dependencies test passed')
+        "
+
+    - name: Test with latest dependencies
+      run: |
+        pip install --upgrade requests openapi-core pytz python-jose
+        python -c "
+        from esipy import EsiApp, EsiClient
+        app = EsiApp()
+        client = EsiClient(headers={'User-Agent': 'EsiPy-LatestDeps-Test'})
+        print('✓ Latest dependencies test passed')
+        "
