@@ -4,15 +4,202 @@ import time
 
 import logging
 import requests
-from six.moves.urllib.error import HTTPError
+from urllib.error import HTTPError
 
-from pyswagger import App
+from openapi_core import OpenAPI
 
 from .utils import check_cache
 from .utils import get_cache_time_left
 from .exceptions import APIException
 
 LOGGER = logging.getLogger(__name__)
+
+
+class OperationProxy:
+    """Proxy object to make OpenAPI operations compatible with pyswagger interface"""
+    
+    def __init__(self, operation_id, openapi_wrapper):
+        self.operation_id = operation_id
+        self.openapi_wrapper = openapi_wrapper
+        self.url = self._extract_url()
+    
+    def _extract_url(self):
+        """Extract URL from the OpenAPI spec for this operation"""
+        spec = self.openapi_wrapper.spec
+        for path, methods in spec.get('paths', {}).items():
+            for method, operation in methods.items():
+                if operation.get('operationId') == self.operation_id:
+                    # Return the path template
+                    return path
+        return None
+    
+    def __call__(self, **kwargs):
+        """Create a request object compatible with EsiClient"""
+        return OperationRequest(self.operation_id, self.openapi_wrapper, **kwargs)
+
+
+class MockResponse:
+    """Mock response object compatible with pyswagger interface"""
+    
+    def __init__(self):
+        self.status = None
+        self.header = {}
+        self.data = None
+        self.raw = None
+        self.raw_body_only = False
+    
+    def reset(self):
+        """Reset response for reuse"""
+        self.status = None
+        self.header = {}
+        self.data = None
+        self.raw = None
+    
+    def apply_with(self, status=None, header=None, raw=None):
+        """Apply response data"""
+        if status is not None:
+            self.status = status
+        if header is not None:
+            self.header = header
+        if raw is not None:
+            self.raw = raw
+            if not self.raw_body_only:
+                import json
+                try:
+                    self.data = json.loads(raw.decode('utf-8'))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    self.data = raw
+
+
+class MockRequest:
+    """Mock request object compatible with pyswagger interface"""
+    
+    def __init__(self, operation_id, openapi_wrapper, **params):
+        self.operation_id = operation_id
+        self.openapi_wrapper = openapi_wrapper
+        self.params = params
+        self.url = self._build_url()
+        self.method = self._get_method()
+        self._p = self._build_params()
+        self.query = {}
+        self.header = {}
+        self.data = None
+        
+    def reset(self):
+        """Reset request for reuse"""
+        pass
+    
+    def prepare(self, scheme=None, handle_files=None):
+        """Prepare request - compatibility method"""
+        pass
+    
+    def _patch(self, opt):
+        """Patch request with options - compatibility method"""
+        pass
+    
+    def _get_method(self):
+        """Get HTTP method for this operation"""
+        spec = self.openapi_wrapper.spec
+        for path, methods in spec.get('paths', {}).items():
+            for method, operation in methods.items():
+                if operation.get('operationId') == self.operation_id:
+                    return method.upper()
+        return 'GET'
+    
+    def _build_url(self):
+        """Build the URL for this request"""
+        spec = self.openapi_wrapper.spec
+        
+        # Extract the base URL from the OpenAPI spec
+        servers = spec.get('servers', [])
+        if servers:
+            base_url = servers[0].get('url', 'https://esi.evetech.net')
+        else:
+            base_url = 'https://esi.evetech.net'
+        
+        base_url = base_url.rstrip('/')
+        
+        for path, methods in spec.get('paths', {}).items():
+            for method, operation in methods.items():
+                if operation.get('operationId') == self.operation_id:
+                    # Replace path parameters
+                    url_path = path
+                    for param_name, param_value in self.params.items():
+                        url_path = url_path.replace(f'{{{param_name}}}', str(param_value))
+                    return base_url + url_path
+        return base_url
+    
+    def _build_params(self):
+        """Build parameters dict compatible with EsiClient"""
+        return {
+            'header': {},
+            'path': {},
+            'query': []
+        }
+
+
+class OperationRequest:
+    """Request object compatible with EsiClient - returns tuple of (request, response)"""
+    
+    def __init__(self, operation_id, openapi_wrapper, **params):
+        self.request = MockRequest(operation_id, openapi_wrapper, **params)
+        self.response = MockResponse()
+    
+    def __iter__(self):
+        """Make this object act like a tuple (request, response)"""
+        return iter([self.request, self.response])
+    
+    def __getitem__(self, index):
+        """Allow indexing like req_and_resp[0] and req_and_resp[1]"""
+        if index == 0:
+            return self.request
+        elif index == 1:
+            return self.response
+        else:
+            raise IndexError("Index out of range")
+
+
+class OperationsCollection:
+    """Collection of operations compatible with pyswagger app.op interface"""
+    
+    def __init__(self, openapi_wrapper):
+        self.openapi_wrapper = openapi_wrapper
+        self._operations = {}
+        self._build_operations()
+    
+    def _build_operations(self):
+        """Build operation proxies from OpenAPI spec"""
+        spec = self.openapi_wrapper.spec
+        for path, methods in spec.get('paths', {}).items():
+            for method, operation in methods.items():
+                operation_id = operation.get('operationId')
+                if operation_id:
+                    self._operations[operation_id] = OperationProxy(operation_id, self.openapi_wrapper)
+    
+    def __getitem__(self, key):
+        return self._operations[key]
+    
+    def __contains__(self, key):
+        return key in self._operations
+    
+    def values(self):
+        return self._operations.values()
+    
+    def keys(self):
+        return self._operations.keys()
+    
+    def items(self):
+        return self._operations.items()
+
+
+class OpenAPIWrapper:
+    """Wrapper to make openapi-core compatible with pyswagger interface"""
+    
+    def __init__(self, spec, base_url):
+        self.spec = spec
+        self.base_url = base_url
+        self.openapi = OpenAPI.from_dict(spec)
+        self.op = OperationsCollection(self)
 
 
 class EsiApp(object):
@@ -119,14 +306,19 @@ class EsiApp(object):
         app = None
         for _retry in range(1, 4):
             try:
-                app = App.create(app_url)
-            except HTTPError as error:
+                # Download the OpenAPI spec
+                spec_response = requests.get(app_url)
+                spec_response.raise_for_status()
+                
+                # Create OpenAPI instance from the spec
+                openapi_spec = spec_response.json()
+                app = OpenAPIWrapper(openapi_spec, app_url)
+            except (HTTPError, requests.RequestException) as error:
                 LOGGER.warning(
-                    "[failure #%d] %s %d: %r",
+                    "[failure #%d] %s: %r",
                     _retry,
                     app_url,
-                    error.code,
-                    error.msg
+                    str(error)
                 )
                 continue
             break

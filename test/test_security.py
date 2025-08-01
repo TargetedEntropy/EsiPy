@@ -1,7 +1,5 @@
 # -*- encoding: utf-8 -*-
 # pylint: skip-file
-from __future__ import absolute_import
-
 import logging
 import time
 import unittest
@@ -10,7 +8,6 @@ import json
 
 from requests.utils import quote
 from jose.exceptions import JWTError
-import six
 import httmock
 
 from esipy import EsiSecurity
@@ -31,7 +28,7 @@ class TestEsiSecurity(unittest.TestCase):
     CALLBACK_URI = "https://foo.bar/baz/callback"
     CLIENT_ID = 'foo'
     SECRET_KEY = 'bar'
-    BASIC_TOKEN = six.u('Zm9vOmJhcg==')
+    BASIC_TOKEN = 'Zm9vOmJhcg=='
     SECURITY_NAME = 'evesso'
     TOKEN_IDENTIFIER = 'ESIPY_TEST_TOKEN'
     CODE_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -380,7 +377,7 @@ class TestEsiSecurity(unittest.TestCase):
                 self.assertEqual(exc.status_code, 502)
                 self.assertEqual(
                     exc.response,
-                    six.b('<html><body>Some HTML Errors</body></html>')
+                    b'<html><body>Some HTML Errors</body></html>'
                 )
 
             try:
@@ -389,7 +386,7 @@ class TestEsiSecurity(unittest.TestCase):
                 self.assertEqual(exc.status_code, 502)
                 self.assertEqual(
                     exc.response,
-                    six.b('<html><body>Some HTML Errors</body></html>')
+                    b'<html><body>Some HTML Errors</body></html>'
                 )
 
     def test_esisecurity_pkce(self):

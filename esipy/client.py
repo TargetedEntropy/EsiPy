@@ -1,7 +1,5 @@
 # -*- encoding: utf-8 -*-
 """ EsiPy Client """
-from __future__ import absolute_import
-
 import time
 import warnings
 import logging
@@ -9,8 +7,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from collections import namedtuple
 
-import six
-from pyswagger.core import BaseClient
+import io
 from requests import Request
 from requests import Session
 from requests.exceptions import (
@@ -34,9 +31,9 @@ CachedResponse = namedtuple(
 )
 
 
-class EsiClient(BaseClient):
-    """ EsiClient is a pyswagger client that override some behavior and
-    also add some features like auto retry, parallel calls... """
+class EsiClient:
+    """ EsiClient is an OpenAPI client that provides ESI-specific functionality
+    including caching, retry mechanisms, and parallel calls... """
 
     __schemes__ = set(['https'])
     __uncached_methods__ = ['POST', 'PUT', 'DELETE', 'HEAD']
@@ -57,7 +54,6 @@ class EsiClient(BaseClient):
         :param no_etag_body: (optional) default False, set to return empty
         response when ETag requests return 304 (normal http behavior)
         """
-        super(EsiClient, self).__init__(security)
         self.security = security
         self._session = Session()
 
@@ -106,6 +102,10 @@ class EsiClient(BaseClient):
 
         self.timeout = kwargs.pop('timeout', None)
         self.no_etag_body = kwargs.pop('no_etag_body', False)
+    
+    def prepare_schemes(self, request):
+        """Prepare schemes for request - compatibility method"""
+        return ['https']
 
     def _retry_request(self, req_and_resp, _retry=0, **kwargs):
         """Uses self._request in a sane retry loop (for 5xx level errors).
@@ -211,8 +211,8 @@ class EsiClient(BaseClient):
         req_and_resp[0].reset()
         req_and_resp[1].reset()
 
-        # required because of inheritance
-        request, response = super(EsiClient, self).request(req_and_resp, opt)
+        # Extract request and response from req_and_resp
+        request, response = req_and_resp
 
         # check cache here so we have all headers, formed url and params
         cache_key = make_cache_key(request)
@@ -231,7 +231,7 @@ class EsiClient(BaseClient):
             response.apply_with(
                 status=res.status_code,
                 header=res.headers,
-                raw=six.BytesIO(res.content).getvalue()
+                raw=io.BytesIO(res.content).getvalue()
             )
 
         except (ValueError, Exception):
@@ -278,8 +278,8 @@ class EsiClient(BaseClient):
         req_and_resp[0].reset()
         req_and_resp[1].reset()
 
-        # required because of inheritance
-        request, response = super(EsiClient, self).request(req_and_resp, opt)
+        # Extract request and response from req_and_resp
+        request, response = req_and_resp
 
         res = self.__make_request(request, opt, method='HEAD')
 

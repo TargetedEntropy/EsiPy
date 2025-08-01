@@ -4,10 +4,7 @@ import hashlib
 import logging
 import datetime
 
-try:
-    import pickle
-except ImportError:  # pragma: no cover
-    import cPickle as pickle
+import pickle
 
 LOGGER = logging.getLogger(__name__)
 

@@ -3,13 +3,10 @@ coverage
 coveralls
 httmock
 nose
-mock
-future
 python-memcached
 diskcache
-pyswagger>=0.8.39
+openapi-core>=0.19.0
 requests
-six
 redis
 pylint
 pytz

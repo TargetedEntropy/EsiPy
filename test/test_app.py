@@ -1,7 +1,5 @@
 # -*- encoding: utf-8 -*-
 # pylint: skip-file
-from __future__ import absolute_import
-
 from esipy import EsiApp
 from esipy.cache import DictCache
 from esipy.exceptions import APIException
@@ -10,7 +8,7 @@ from pyswagger import App
 import httmock
 import mock
 import unittest
-from six.moves.urllib.error import HTTPError
+from urllib.error import HTTPError
 
 from .mock import _swagger_spec_mock_
 from .mock import make_expire_time_str
@@ -31,14 +29,14 @@ class TestEsiApp(unittest.TestCase):
     ESI_META_SWAGGER = 'test/resources/meta_swagger.json'
     ESI_V1_SWAGGER = 'test/resources/swagger.json'
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def setUp(self, urlopen_mock):
         # I hate those mock... thx urlopen instead of requests...
         urlopen_mock.return_value = open(TestEsiApp.ESI_META_SWAGGER)
         with httmock.HTTMock(*_swagger_spec_mock_):
             self.app = EsiApp(cache_prefix='esipy_test')
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_op_attribute(self, urlopen_mock):
         self.assertTrue(self.app.op)
         self.assertEqual(
@@ -58,7 +56,7 @@ class TestEsiApp(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.app.verify
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_invalid_cache_value(self, urlopen_mock):
         cache = DictCache()
         cache.set(self.app.esi_meta_cache_key, 'somerandomvalue')
@@ -71,7 +69,7 @@ class TestEsiApp(unittest.TestCase):
             'somerandomvalue'
         )
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_getattr_and_cache(self, urlopen_mock):
         with httmock.HTTMock(*_swagger_spec_mock_):
             urlopen_mock.return_value = open(TestEsiApp.ESI_V1_SWAGGER)
@@ -101,7 +99,7 @@ class TestEsiApp(unittest.TestCase):
                 self.app.cache.get(self.app.esi_meta_cache_key, None)
             )
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_getattr_no_cache(self, urlopen_mock):
         with httmock.HTTMock(*_swagger_spec_mock_):
             urlopen_mock.return_value = open(TestEsiApp.ESI_META_SWAGGER)
@@ -118,7 +116,7 @@ class TestEsiApp(unittest.TestCase):
             self.assertIsNone(
                 app_nocache.cache.get(self.ESI_V1_CACHE_KEY, None))
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_expired_header_etag(self, urlopen_mock):
         @httmock.all_requests
         def check_etag(url, request):
@@ -152,7 +150,7 @@ class TestEsiApp(unittest.TestCase):
             self.assertEqual(cached_app, esiapp.app)
             urlopen_mock.return_value.close()
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_expired_header_no_etag(self, urlopen_mock):
         cache = DictCache()
         with httmock.HTTMock(*_swagger_spec_mock_):
@@ -168,7 +166,7 @@ class TestEsiApp(unittest.TestCase):
             appv1_uncached = app.get_v1_swagger
             self.assertNotEqual(appv1, appv1_uncached)
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_valid_header_etag(self, urlopen_mock):
         @httmock.all_requests
         def fail_if_request(url, request):
@@ -185,7 +183,7 @@ class TestEsiApp(unittest.TestCase):
             EsiApp(cache_time=None, cache=cache, cache_prefix='esipy_test')
             urlopen_mock.return_value.close()
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_http_error_retry_fail(self, urlopen_mock):
         urlopen_mock.side_effect = HTTPError(
             "http://mock.test",
@@ -199,7 +197,7 @@ class TestEsiApp(unittest.TestCase):
                 self.app = EsiApp(cache_prefix='esipy_test')
             self.assertEqual(urlopen_mock.call_count, 3)
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def test_app_http_error_retry_ok(self, urlopen_mock):
         http_error = HTTPError(
             "http://mock.test",
