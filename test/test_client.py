@@ -1,7 +1,5 @@
 # -*- encoding: utf-8 -*-
 # pylint: skip-file
-from __future__ import absolute_import
-
 from .mock import _all_auth_mock_
 from .mock import eve_status
 from .mock import eve_status_noetag
@@ -27,7 +25,6 @@ from requests.exceptions import ConnectionError
 
 import httmock
 import mock
-import six
 import time
 import unittest
 import warnings
@@ -46,13 +43,13 @@ class TestEsiPy(unittest.TestCase):
     OAUTH_TOKEN = "%s/oauth/token" % LOGIN_EVE
     CLIENT_ID = 'foo'
     SECRET_KEY = 'bar'
-    BASIC_TOKEN = six.u('Zm9vOmJhcg==')
+    BASIC_TOKEN = 'Zm9vOmJhcg=='
     SECURITY_NAME = 'evesso'
 
     RSC_SSO_ENDPOINTS = "test/resources/oauth-authorization-server.json"
     RSC_JWKS = "test/resources/jwks.json"
 
-    @mock.patch('six.moves.urllib.request.urlopen')
+    @mock.patch('urllib.request.urlopen')
     def setUp(self, urlopen_mock):
         # I hate those mock... thx urlopen instead of requests...
         urlopen_mock.return_value = open('test/resources/swagger.json')
@@ -399,7 +396,7 @@ class TestEsiPy(unittest.TestCase):
                 self.assertEqual(exc.status_code, 502)
                 self.assertEqual(
                     exc.response,
-                    six.b('<html><body>Some HTML Errors</body></html>')
+                    b'<html><body>Some HTML Errors</body></html>'
                 )
 
             try:
@@ -408,5 +405,5 @@ class TestEsiPy(unittest.TestCase):
                 self.assertEqual(exc.status_code, 502)
                 self.assertEqual(
                     exc.response,
-                    six.b('<html><body>Some HTML Errors</body></html>')
+                    b'<html><body>Some HTML Errors</body></html>'
                 )
