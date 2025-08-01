@@ -6,15 +6,15 @@ EsiPy |PyPI Version| |PyPI Python Version|
 | **Full Documentation can be found here:**
 | |Documentation Status|
 
-If someone wants to maintain a fork, please let me know so I can mention it here and in the docs
+Unofficial fork of https://github.com/Kyria/EsiPy
 ======
 
 What is EsiPy
 -------------
 
-EsiPy is a python swagger client, taking advantages of `pyswagger`_
-while rewriting some parts of it to be better used with EVE Online ESI
-API.
+EsiPy is a Python client for EVE Online's ESI API. Originally built with pyswagger,
+it has been updated to use openapi-core for Python 3.12 compatibility while maintaining
+backward compatibility with existing code.
 
 Example using EsiPy
 -------------------
@@ -30,7 +30,11 @@ Contacts
    -  `TweetFleet Slack <https://www.fuzzwork.co.uk/tweetfleet-slack-invites/>`_: @althalus
    - Reddit: /u/Karlyna
 
-.. _pyswagger: https://github.com/mission-liao/pyswagger
+Python Version Support
+----------------------
+
+EsiPy supports Python 3.8 through 3.12. The library has been updated to work with
+modern Python versions while maintaining compatibility with existing applications.
 .. _Flask+EsiPy: https://github.com/Kyria/flask-esipy-example
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/EsiPy.svg
    :target: https://pypi.python.org/pypi/EsiPy
